@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'dart:js_interop';
 import 'dart:math';
 import 'dart:typed_data';
+
+import 'package:web/web.dart';
 
 import '../../cryptography_plus.dart';
 import '../../helpers.dart';
@@ -165,7 +168,7 @@ class BrowserSecretKey extends SecretKey {
   }
 
   /// Returns Javascript object that can be used in WebCrypto API.
-  static Future<web_crypto.CryptoKey> jsCryptoKeyForAes(
+  static Future<CryptoKey> jsCryptoKeyForAes(
     SecretKey secretKey, {
     required String webCryptoAlgorithm,
     required int secretKeyLength,
@@ -185,15 +188,18 @@ class BrowserSecretKey extends SecretKey {
     if (actualSecretKeyLength != secretKeyLength) {
       throw _secretKeyLengthError(actualSecretKeyLength, secretKeyLength);
     }
-    return web_crypto.importKeyWhenRaw(
-      jsArrayBufferFrom(secretKeyBytes),
-      webCryptoAlgorithm,
-      isExtractable,
-      [
-        if (allowEncrypt) 'encrypt',
-        if (allowDecrypt) 'decrypt',
-      ],
-    );
+    return window.crypto.subtle
+        .importKey(
+          'raw',
+          byteBufferFrom(secretKeyBytes).toJS,
+          webCryptoAlgorithm.toJS,
+          isExtractable,
+          [
+            if (allowEncrypt) 'encrypt'.toJS,
+            if (allowDecrypt) 'decrypt'.toJS,
+          ].toJS,
+        )
+        .toDart;
   }
 
   static ArgumentError _secretKeyLengthError(int actual, int expected) {

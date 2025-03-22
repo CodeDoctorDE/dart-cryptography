@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'dart:js_interop';
 import 'dart:typed_data';
+
+import 'package:web/web.dart';
 
 import '../../cryptography_plus.dart';
 import '_javascript_bindings.dart' as web_crypto;
 
 class BrowserEcKeyPair extends KeyPair implements EcKeyPair {
-  final web_crypto.CryptoKey? jsPrivateKeyForEcdsa;
-  final web_crypto.CryptoKey? jsPublicKeyForEcdsa;
-  final web_crypto.CryptoKey? jsPrivateKeyForEcdh;
-  final web_crypto.CryptoKey? jsPublicKeyForEcdh;
+  final CryptoKey? jsPrivateKeyForEcdsa;
+  final CryptoKey? jsPublicKeyForEcdsa;
+  final CryptoKey? jsPrivateKeyForEcdh;
+  final CryptoKey? jsPublicKeyForEcdh;
   final KeyPairType keyPairType;
   final bool isExtractable;
   final bool allowSign;
@@ -68,9 +71,12 @@ class BrowserEcKeyPair extends KeyPair implements EcKeyPair {
       throw StateError('Key pair is not extractable');
     }
     try {
-      final jwk = await web_crypto.exportKeyWhenJwk(
-        jsKeyPair,
-      );
+      final jwk = await window.crypto.subtle
+          .exportKey(
+            'jwk',
+            jsKeyPair,
+          )
+          .toDart;
       return EcKeyPairData(
         type: keyPairType,
         d: web_crypto.base64UrlDecodeUnmodifiable(jwk.d!),

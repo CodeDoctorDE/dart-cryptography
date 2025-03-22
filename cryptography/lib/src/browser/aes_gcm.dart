@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import 'dart:html' as html;
+import 'dart:js_interop';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography_plus/cryptography_plus.dart';
 import 'package:cryptography_plus/src/browser/browser_secret_key.dart';
+import 'package:web/web.dart';
 
-import '_javascript_bindings.dart' show jsArrayBufferFrom;
 import '_javascript_bindings.dart' as web_crypto;
 
 /// AES-GCM implementation that uses _Web Cryptography API_ in browsers.
@@ -87,18 +87,20 @@ class BrowserAesGcm extends AesGcm implements StreamingCipher {
     cipherTextAndMac.setAll(0, cipherText);
     cipherTextAndMac.setAll(cipherText.length, macBytes);
     try {
-      final byteBuffer = await web_crypto.decrypt(
-        web_crypto.AesGcmParams(
-          name: _webCryptoName,
-          iv: jsArrayBufferFrom(secretBox.nonce),
-          additionalData: jsArrayBufferFrom(aad),
-          tagLength: macBytes.length * 8,
-        ),
-        jsCryptoKey,
-        jsArrayBufferFrom(cipherTextAndMac),
-      );
-      return Uint8List.view(byteBuffer);
-    } on html.DomException catch (e) {
+      final byteBuffer = await window.crypto.subtle
+          .decrypt(
+            web_crypto.AesGcmParams(
+              name: _webCryptoName,
+              iv: web_crypto.byteBufferFrom(secretBox.nonce),
+              additionalData: web_crypto.byteBufferFrom(aad),
+              tagLength: macBytes.length * 8,
+            ).jsify()!,
+            jsCryptoKey,
+            web_crypto.byteBufferFrom(cipherTextAndMac).toJS,
+          )
+          .toDart;
+      return Uint8List.view((byteBuffer as JSArrayBuffer).toDart);
+    } on DOMException catch (e) {
       if (e.name == 'OperationError') {
         throw SecretBoxAuthenticationError();
       }
@@ -132,16 +134,19 @@ class BrowserAesGcm extends AesGcm implements StreamingCipher {
       allowEncrypt: true,
       allowDecrypt: false,
     );
-    final byteBuffer = await web_crypto.encrypt(
-      web_crypto.AesGcmParams(
-        name: 'AES-GCM',
-        iv: jsArrayBufferFrom(nonce),
-        additionalData: jsArrayBufferFrom(aad),
-        tagLength: macAlgorithm.macLength * 8,
-      ),
-      jsCryptoKey,
-      jsArrayBufferFrom(clearText),
-    );
+    final byteBuffer = ((await window.crypto.subtle
+            .encrypt(
+              web_crypto.AesGcmParams(
+                name: 'AES-GCM',
+                iv: web_crypto.byteBufferFrom(nonce),
+                additionalData: web_crypto.byteBufferFrom(aad),
+                tagLength: macAlgorithm.macLength * 8,
+              ).jsify()!,
+              jsCryptoKey,
+              web_crypto.byteBufferFrom(clearText).toJS,
+            )
+            .toDart) as JSArrayBuffer)
+        .toDart;
 
     final cipherText = Uint8List.view(
       byteBuffer,

@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'dart:js_interop';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography_plus/cryptography_plus.dart';
+import 'package:cryptography_plus/src/browser/_javascript_bindings.dart';
+import 'package:web/web.dart';
 
-import '_javascript_bindings.dart' show jsArrayBufferFrom;
 import '_javascript_bindings.dart' as web_crypto;
 import 'browser_secret_key.dart';
 
@@ -67,15 +69,17 @@ class BrowserAesCbc extends AesCbc {
       allowEncrypt: false,
       allowDecrypt: true,
     );
-    final byteBuffer = await web_crypto.decrypt(
-      web_crypto.AesCbcParams(
-        name: _webCryptoName,
-        iv: jsArrayBufferFrom(secretBox.nonce),
-      ),
-      jsCryptoKey,
-      jsArrayBufferFrom(secretBox.cipherText),
-    );
-    return Uint8List.view(byteBuffer);
+    final byteBuffer = await window.crypto.subtle
+        .decrypt(
+          AesCbcParams(
+            name: _webCryptoName,
+            iv: byteBufferFrom(secretBox.nonce),
+          ).jsify()!,
+          jsCryptoKey,
+          byteBufferFrom(secretBox.cipherText).toJS,
+        )
+        .toDart;
+    return Uint8List.view((byteBuffer as JSArrayBuffer).toDart);
   }
 
   @override
@@ -97,15 +101,17 @@ class BrowserAesCbc extends AesCbc {
       allowEncrypt: true,
       allowDecrypt: false,
     );
-    final byteBuffer = await web_crypto.encrypt(
-      web_crypto.AesCbcParams(
-        name: _webCryptoName,
-        iv: jsArrayBufferFrom(nonce),
-      ),
-      jsCryptoKey,
-      jsArrayBufferFrom(clearText),
-    );
-    final cipherText = Uint8List.view(byteBuffer);
+    final byteBuffer = await window.crypto.subtle
+        .encrypt(
+          web_crypto.AesCbcParams(
+            name: _webCryptoName,
+            iv: byteBufferFrom(nonce),
+          ).jsify()!,
+          jsCryptoKey,
+          byteBufferFrom(clearText).toJS,
+        )
+        .toDart;
+    final cipherText = Uint8List.view((byteBuffer as JSArrayBuffer).toDart);
 
     final mac = await macAlgorithm.calculateMac(
       cipherText,
